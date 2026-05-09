@@ -4,7 +4,6 @@ import plotly.express as px
 
 st.set_page_config(page_title="Pharma Sales Dashboard", layout="wide")
 
-# Load data
 @st.cache_data
 def load_data():
     df = pd.read_csv("cleaned_data.csv")
@@ -15,38 +14,51 @@ def load_data():
 
 df = load_data()
 
-# Title
 st.title("📊 Pharma Sales Dashboard")
 st.markdown("---")
 
-# Filters
+# ── Step 1: Party filter ───────────────────────────────────
 col1, col2, col3, col4 = st.columns(4)
 
 with col1:
     parties = ["All"] + sorted(df["Party_Name"].dropna().unique().tolist())
     party = st.selectbox("Party", parties)
 
+# Filter by party first
+if party != "All":
+    filtered_by_party = df[df["Party_Name"] == party]
+else:
+    filtered_by_party = df.copy()
+
+# ── Step 2: Make filter — only party ka data ──────────────
 with col2:
-    makes = ["All"] + sorted(df["Make"].dropna().unique().tolist())
+    makes = ["All"] + sorted(filtered_by_party["Make"].dropna().unique().tolist())
     make = st.selectbox("Make", makes)
 
+if make != "All":
+    filtered_by_make = filtered_by_party[filtered_by_party["Make"] == make]
+else:
+    filtered_by_make = filtered_by_party.copy()
+
+# ── Step 3: Product filter — only party+make ka data ──────
 with col3:
-    products = ["All"] + sorted(df["Item_Description"].dropna().unique().tolist())
+    products = ["All"] + sorted(filtered_by_make["Item_Description"].dropna().unique().tolist())
     product = st.selectbox("Product", products)
 
-with col4:
-    min_date = df["Date"].min()
-    max_date = df["Date"].max()
-    date_range = st.date_input("Date Range", [min_date, max_date])
-
-# Apply filters
-filtered = df.copy()
-if party != "All":
-    filtered = filtered[filtered["Party_Name"] == party]
-if make != "All":
-    filtered = filtered[filtered["Make"] == make]
 if product != "All":
-    filtered = filtered[filtered["Item_Description"] == product]
+    filtered_by_product = filtered_by_make[filtered_by_make["Item_Description"] == product]
+else:
+    filtered_by_product = filtered_by_make.copy()
+
+# ── Step 4: Date filter — only selected data ki dates ─────
+with col4:
+    min_date = filtered_by_product["Date"].min()
+    max_date = filtered_by_product["Date"].max()
+    date_range = st.date_input("Date Range", [min_date, max_date],
+                                min_value=min_date, max_value=max_date)
+
+# Final filter
+filtered = filtered_by_product.copy()
 if len(date_range) == 2:
     filtered = filtered[
         (filtered["Date"] >= pd.Timestamp(date_range[0])) &
@@ -55,7 +67,7 @@ if len(date_range) == 2:
 
 st.markdown("---")
 
-# KPI Cards
+# ── KPI Cards ─────────────────────────────────────────────
 k1, k2, k3, k4 = st.columns(4)
 k1.metric("Total Sales", f"₹{filtered['Amount'].sum():,.0f}")
 k2.metric("Total Qty", f"{filtered['Qty'].sum():,.0f}")
@@ -64,7 +76,7 @@ k4.metric("Total Parties", filtered["Party_Name"].nunique())
 
 st.markdown("---")
 
-# Charts
+# ── Charts ────────────────────────────────────────────────
 c1, c2 = st.columns(2)
 
 with c1:
